@@ -23,7 +23,7 @@ See node.ipynb, once you train the model, it's saved to the "./graphs" directory
 ## Training script
 
 ### 1. training template for generic graph datasets
-By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can relace the key work "empirical" with "neural" if you have trained your neural degree sampler.
+By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can replace the key work "empirical" with "neural" in the option "--empty_graph_sampler" if you have trained your neural degree sampler.
 ```
 #!/bin/bash
 
