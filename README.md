@@ -1,6 +1,6 @@
 # EDGE
 
-Official pytorch implementation for ["EDGE: Efficient and Degree-Guided Graph Generation via Discrete Diffusion Modeling"](https://arxiv.org/pdf/2305.04111.pdf). Our code is devloped based on https://github.com/ehoogeboom/multinomial_diffusion. 
+Official pytorch implementation for ["Efficient and Degree-Guided Graph Generation via Discrete Diffusion Modeling"](https://arxiv.org/pdf/2305.04111.pdf). Our code is devloped based on https://github.com/ehoogeboom/multinomial_diffusion. 
 
 We use the evaluation modules provided by https://github.com/uoguelph-mlrg/GGM-metrics and https://github.com/hheidrich/CELL.
 
@@ -23,7 +23,7 @@ See node.ipynb, once you train the model, it's saved to the "./graphs" directory
 ## Training script
 
 ### 1. training template for generic graph datasets
-By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can replace the key work "empirical" with "neural" in the option "--empty_graph_sampler" if you have trained your neural degree sampler.
+By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can replace the key work _empirical_ with _neural_ in the option _--empty_graph_sampler_ if you have trained your neural degree sampler.
 ```
 #!/bin/bash
 
