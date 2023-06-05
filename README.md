@@ -23,7 +23,7 @@ See node.ipynb, once you train the model, it's saved to the "./graphs" directory
 ## Training script
 
 ### 1. training template for generic graph datasets
-By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can replace the keyword _empirical_ with _neural_ in the option _--empty_graph_sampler_ if you have trained your neural degree sampler.
+By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can replace the keyword `empirical` with `neural` in the option `--empty_graph_sampler` if you have trained your neural degree sampler.
 ```
 #!/bin/bash
 
@@ -80,7 +80,7 @@ python train.py \
         --degree \
         --num_heads 8 8 8 8 1 
 ```
-Evaluation is done every _eval_every_ epochs. You can also re-evaluate a specific checkpoint using the script below. 
+Evaluation is done every `eval_every` epochs. You can also re-evaluate a specific checkpoint using the script below. 
 
 ## Evaluation script
 ```
