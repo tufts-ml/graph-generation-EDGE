@@ -28,6 +28,29 @@ add_optim_args(parser)
 args = parser.parse_args()
 set_seeds(args.seed)
 
+args.epochs = 50000
+args.num_generation = 64
+args.num_iter = 256
+args.diffusion_dim = 64
+args.diffusion_steps =512
+args.device = 'cuda:0'
+args.dataset = 'polblogs'
+args.batch_size =4
+args.clip_value =1
+args.lr =1e-4
+args.final_prob_edge = [1, 0]
+args.sample_time_method = 'importance'
+args.check_every = 50
+args.eval_every = 50
+args.noise_schedule = 'linear'
+args.dp_rate =0.1
+args.loss_type = 'vb_ce_xt_kl_st'
+args.arch = 'TGNN_active'
+args.parametrization = 'vb_ce_xt_kl_st'
+args.degree = True
+args.num_heads = [8, 8, 8, 8,1]
+
+
 ##################
 ## Specify data ##
 ##################

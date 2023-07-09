@@ -71,7 +71,7 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
          
     @torch.no_grad()
     def p_sample(self, batched_graph, t_node, t_edge):
-        self._p_sample_and_set_actives(batched_graph, t_node)
+        self._p_sample_and_set_actives(batched_graph, t_node, t_edge)
         assert hasattr(batched_graph, 'active_node_indices')
         assert hasattr(batched_graph, 'active_edge_indices')
         if batched_graph.active_edge_indices.size(0) == 0:
@@ -118,7 +118,7 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
 
         return log_node_change_given_dt_given_dstart
 
-    def _p_sample_and_set_actives(self, batched_graph, t_node):
+    def _p_sample_and_set_actives(self, batched_graph, t_node, t_edge):
         if self.parametrization == 'xt_prescribed_st':
             degree_t = self._compute_degree(batched_graph.log_full_edge_attr_t.argmax(1), batched_graph.full_edge_index, batched_graph.num_nodes)
             log_model_prob_active = self._q_posterior_actives(batched_graph.degree, degree_t, t_node)
@@ -127,9 +127,14 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
             batched_graph.active_edge_indices = active_node_masks[batched_graph.full_edge_index[0]].logical_and(
             active_node_masks[batched_graph.full_edge_index[1]]).nonzero(as_tuple=True)[0] 
         elif self.parametrization == 'xt_st': 
-            pass #TODO
+            log_model_prob_active = self._predict_st_given_xt(self, batched_graph, t_node, t_edge)
+            active_node_masks = self.log_sample_categorical(log_model_prob_active, num_classes=2).argmax(1).bool()
+            batched_graph.active_node_indices = active_node_masks.nonzero(as_tuple=True)[0]
+            batched_graph.active_edge_indices = active_node_masks[batched_graph.full_edge_index[0]].logical_and(
+            active_node_masks[batched_graph.full_edge_index[1]]).nonzero(as_tuple=True)[0] 
         else:
             raise NotImplementedError
+        
 
     def _q_set_actives(self, batched_graph):
         degree_tmin1 = self._compute_degree(batched_graph.log_full_edge_attr_tmin1.argmax(1), batched_graph.full_edge_index, batched_graph.num_nodes)
@@ -140,7 +145,8 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
         batched_graph.active_node_indices = active_node_masks.nonzero(as_tuple=True)[0]
         # set up active edge indices, if K nodes are active, the length of active_edges_indices is K * (K-1) // 2
         batched_graph.active_edge_indices = active_node_masks[batched_graph.full_edge_index[0]].logical_and(
-            active_node_masks[batched_graph.full_edge_index[1]]).nonzero(as_tuple=True)[0]
+            active_node_masks[batched_graph.full_edge_index[1]]).nonzero(as_tuple=True)[0] 
+        #two nodes determine one edge. So if one of the two codes has been changed, the edge is an active one.
         batched_graph.edge_predict_masks = active_node_masks[batched_graph.full_edge_index[0]].logical_and(
             active_node_masks[batched_graph.full_edge_index[1]])
 
@@ -153,8 +159,27 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
         log_pred_node = F.log_softmax(out_node, dim=1)
         log_pred_edge = F.log_softmax(out_edge, dim=1)
         return log_pred_node, log_pred_edge
+    
+    #new code start
+    def _predict_st_given_xt(self, batched_graph, t_node, t_edge):
+        out_active = self._denoise_fn._predict_nodes(batched_graph, t_node, t_edge)
+
+        assert out_active.size(1) == 2
+
+        log_pred_active = F.log_softmax(out_active, dim=1)
+        return log_pred_active
+    #new code end
 
     def _compute_MC_KL_joint(self, batched_graph, t, t_node, t_edge):
+        #loss for introduced active node loss
+        degree_t = self._compute_degree(batched_graph.log_full_edge_attr_t.argmax(1), batched_graph.full_edge_index, batched_graph.num_nodes)
+        log_true_prob_active = self._q_posterior_actives(batched_graph.degree, degree_t, t_node)
+        log_model_prob_active = self._predict_st_given_xt(batched_graph, t_node, t_edge)
+        loss_active = self.multinomial_kl(log_true_prob_active, log_model_prob_active)
+
+        loss_active = scatter(loss_active, batched_graph.batch, dim=-1, reduce='sum', dim_size=batched_graph.num_graphs)
+        
+        #loss for vanilla diffusion loss given st 
         log_model_prob_node, log_model_prob_edge = self._p_pred(batched_graph=batched_graph, t_node=t_node, t_edge=t_edge)
 
         active_edge_attr_tmin1 = batched_graph.log_full_edge_attr_tmin1.index_select(0, batched_graph.active_edge_indices)
@@ -164,7 +189,6 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
 
         cross_ent_edge = -log_categorical(active_edge_attr_tmin1, log_model_prob_edge)
        
-
 
         cross_ent_edge = scatter(cross_ent_edge, batched_graph.batch[batched_graph.full_edge_index[0].index_select(0, batched_graph.active_edge_indices)], dim=-1, reduce='sum', dim_size=batched_graph.num_graphs)
 
@@ -177,17 +201,23 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
         ent_edge = 6.9078e-29 * batched_graph.edges_per_graph
         loss_edge = cross_ent_edge + ent_edge
 
-        loss = loss_node + loss_edge
-        return loss    
+        loss = loss_node + loss_edge + loss_active
+        return loss  
+ 
 
     def _p_pred(self, batched_graph, t_node, t_edge):
         if self.parametrization in ['x0', 'xt']:
             return super(BinomialDiffusionActive, self)._p_pred(batched_graph, t_node, t_edge)
-        elif self.parametrization == 'xt_prescribed_st':
+        elif self.parametrization == 'xt_prescribed_st' or 'vb_ce_xt_kl_st':
             log_model_pred_node, log_model_pred_edge = self._predict_xtmin1_given_xt_st(batched_graph, t_node=t_node, t_edge=t_edge) 
             return log_model_pred_node, log_model_pred_edge
-        elif self.parametrization == 'xt_st':
-            pass # TODO
+        # elif self.parametrization == 'xt_st':
+        #     # pass # TODO
+        #     #new code start
+        #     log_model_pred_node, log_model_pred_edge = self._predict_xtmin1_given_xt_st(batched_graph, t_node=t_node, t_edge=t_edge) 
+        #     log_model_pred_st = self._predict_st_given_xt(batched_graph, t_node=t_node, t_edge=t_edge)
+        #     return log_model_pred_node, log_model_pred_edge, log_model_pred_st
+        #     #new code end
 
     def _calc_num_entries(self, batched_graph):
         return batched_graph.full_edge_attr.shape[0]# + batched_graph.node_attr.shape[0]
@@ -231,10 +261,36 @@ class BinomialDiffusionActive(BinomialDiffusionVanilla):
         else:
             b = batched_graph.num_graphs
             if self.loss_type == 'vb_ce_xt_kl_st':
-                pass # TODO
+                #new code start
+                t, pt =  self._sample_time(b, self.device, self.sample_time_method)
+
+                t_node = t.repeat_interleave(batched_graph.nodes_per_graph)
+                t_edge = t.repeat_interleave(batched_graph.edges_per_graph)
+                self._q_sample_and_set_xtmin1_xt_given_x0(batched_graph, t_node, t_edge)
+
+                self._q_set_actives(batched_graph)
+
+                kl = self._compute_MC_KL_joint(batched_graph, t, t_node, t_edge)
+
+                Lt2 = kl.pow(2)
+                Lt2_prev = self.Lt_history.gather(dim=0, index=t)
+                new_Lt_history = (0.1 * Lt2 + 0.9 * Lt2_prev).detach()
+                self.Lt_history.scatter_(dim=0, index=t, src=new_Lt_history)
+                self.Lt_count.scatter_add_(dim=0, index=t, src=torch.ones_like(Lt2))
+
+                kl_prior = self._kl_prior(batched_graph=batched_graph)# TODO replaced it back to _ce_prior
+                # Upweigh loss term of the kl
+                vb_loss = kl / pt + kl_prior
+
+                batched_graph.num_entries = self._calc_num_entries(batched_graph)
+
+                return -vb_loss
+                #new code end
 
             elif self.loss_type == 'vb_ce_xt_ce_st':
                 pass # TODO
+                
+                
             
             elif self.loss_type == 'vb_ce_xt_prescribred_st':
                 t, pt =  self._sample_time(b, self.device, self.sample_time_method)
