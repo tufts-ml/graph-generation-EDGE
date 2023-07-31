@@ -17,6 +17,8 @@ torch-geometric
 tqdm
 wandb
 ```
+and dependencies from  https://github.com/uoguelph-mlrg/GGM-metrics, https://github.com/hheidrich/CELL and https://github.com/ehoogeboom/multinomial_diffusion.
+
 ## Training your degree sequence model
 See node.ipynb, once you train the model, it's saved to the "./graphs" directory.
 
