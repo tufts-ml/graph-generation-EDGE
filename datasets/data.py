@@ -104,8 +104,8 @@ def get_data(args):
             test_pygraphs.append(pyg_data)
             
         train_set = ConcatDataset([GraphDataset(train_pygraphs) for _ in range(repeat)])
-        eval_set = GraphDataset(eval_pygraphs+test_pygraphs)
-        test_set = GraphDataset(test_pygraphs+eval_pygraphs)
+        eval_set = GraphDataset(eval_pygraphs)
+        test_set = GraphDataset(test_pygraphs)
 
         if args.empty_graph_sampler == 'empirical':
             initial_graph_sampler = EmpiricalEmptyGraphGenerator(train_pygraphs, degree=args.degree)
