@@ -23,7 +23,7 @@ and dependencies from  https://github.com/uoguelph-mlrg/GGM-metrics, https://git
 See node.ipynb, once you train the model, it's saved to the "./graphs" directory.
 
 ## Training script
-🌟**IMPORTANT**: Do not use large diffusion steps for small graphs with less than 100 nodes, for those small graph datasets, please try #diffusion steps={8,16,32,64}
+🌟**IMPORTANT note on running EDGE for you own datasets**: Do not use large diffusion steps for small graphs with less than 100 nodes, for those small graph datasets, please try #diffusion steps={8,16,32,64}
 
 ### 1. training template for generic graph datasets
 By default we use empirical degree sampler, which randomly takes a degree sequence from the training data as $d^0$ to perform degree guidance. You can replace the keyword `empirical` with `neural` in the option `--empty_graph_sampler` if you have trained your neural degree sampler.
